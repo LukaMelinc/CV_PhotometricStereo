@@ -1,101 +1,84 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2
 import math
 import os
+from mpl_toolkits.mplot3d import Axes3D
+
+"""
+circle data - calibration data/radii info for the object
+light_directions.txt - set of 20 light directions
+"""
+
 
 # paths to data
 circle_data_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1/circle_data.txt"
-light_directions = np.loadtxt("/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1/light_directions.txt")
-image_directory = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1"
+light_directions_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1/light_directions.txt"
+image_directory_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1"
 
-# loading the images
+light_directions = np.loadtxt(light_directions_path).T
+print(f"Loaded light directions: {light_directions.shape}")
 
-def load_images(image_directory):
-    images = []
-    filenames = sorted(os.listdir(image_directory))
-    for filename in filenames:
-        img = plt.imread(os.path.join(image_directory, filename))
-        if img.ndim == 3:
-            img = np.mean(img, axis=2)
+circle_data = np.loadtxt(circle_data_path)
+center_x, center_y, radius = circle_data
+print(f"circle center: ({center_x}, {center_y}, radius: {radius})")
+
+# LOADING IMAGES
+exclude_name = "ref.JPG"
+image_files = [f for f in os.listdir(image_directory_path) if f.endswith(('.JPG')) and exclude_name not in f]
+
+images = []
+for img_file in image_files:
+    img_path = os.path.join(image_directory_path, img_file)
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    if img is not None:
         images.append(img)
-    return np.array(images)
-images = load_images(image_directory)
+    else:
+        print(f"failed to load image {img_file}")
+    images.append(img)
 
-print(len(images))
+images = np.stack(images, axis=-1)       # shape: [height, width, num_images]
+print(f"Loaded images: {images.shape}")
 
-assert images.shape[0] == light_directions.shape[0],
+# ESTIMATING NORMAL MAP
 
-def compute_normals(images, light_directions):
-    h, w = images[0].shape
-    normals = np.zeros((h, w, 3))
-    for i in range(h):
-        for j in range(w):
-            I = images[:, i, j]
-            S = light_directions
-            # solving the system I = S * n
-            n_tilda = np.linalg.lstsq(S, I, rcond=None)[0]  #least squares
-            rho = np.linalg.norm(n_tilda)
-            normals[i, j] = n_tilda / rho if rho != 0 else [0, 0, 0]
-    return normals
+h, w, n = images.shape
+I = images.reshape(-1, n).T     # shape: [num_images, h*w]
 
-normals = compute_normals(images, light_directions)
+# solve for normal vectors using LS
+normals = np.linalg.lstsq(light_directions, I, rcond=None)[0].T     # shape: (h*w, 3)
+normals = normals.reshape(h, w, 3)  # reshape to 3d normal map
+normals /= np.linalg.norm(normals, axis=2, keepdims=True)
+
+print(f"Computed normal map: {normals.shape}")
 
 
-#visualziation of the noramls
-def visualize_noramls(normals):
-    normal_map = (normals + 1) / 2
-    plt.imshow(normal_map)
-    plt.title("Normal Map")
-    plt.show()
+# DEPTH MAP
+def frankotchellappa(p, q):
+    h, w = p.shape
+    fx = np.fft.fftfreq(w)
+    fy = np.fft.fftfreq(h)
+    FX, FY = np.meshgrid(fx, fy)
 
-visualize_noramls(normals)
+    F = (1j * FX * np.fft.fft2(p) + 1j * FY * np.fft.fft2(q)) / (FX**2 + FY**2 + 1e-6)
+    depth = np.real(np.fft.ifft2(F))
+    return depth
 
-# surface reconstruction
-def reconstruction_surface(normals):
-    h, w, _ = normals.shape
-    depth_map = np.zeros((h, w))
-    for i in range(1, h):
-        depth_map[i, 0] = depth_map[i-1, 0] + normals[i, 0, 1] / normals[i, 0, 2]
-    for j in range(1, w):
-        depth_map[:, j] = depth_map[:, j-1] + normals[:, j, 0] / normals[:, j, 2]
-    return depth_map
-depth_map = reconstruction_surface(normals)
+# Compute p and q from normals
+p = normals[:, :, 0] / normals[:, :, 2]
+q = normals[:, :, 1] / normals[:, :, 2]
+
+# Recover depth map
+depth_map = frankotchellappa(p, q)
+print(f"Recovered depth map: {depth_map.shape}")
 
 
-plt.imshow(depth_map, cmap='gray')
-plt.title("depth map")
-plt.colorbar()
+
+# VISUALIZATION OF THE RESULTS
+# ploting of the depth map
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+X, Y = np.meshgrid(np.arange(w), np.arange(h))
+ax.plot_surface(X, Y, depth_map, cmap='viridis', edgecolor='none')
+plt.title('Reconstructed Surface')
 plt.show()
-
-
-
-"""
-
-
-for i in os.listdir(image_directory):
-    with open(os.path.join())
-
-def cosineLaw(angle, radiance):
-    Intensity = math.cos(angle) * radiance
-    return Intensity
-
-def f_point(p, q):
-    f = (2 * p) / (1 + math.sqrt(1 + p**2 + q**2))
-    return f
-
-def g_point(p, q):
-    g = (2 * q) / (1 + math.sqrt(1 + p*+2 + q*+2))
-    return g
-
-# plane z = 1 is the pq plane
-def theta(p_source, q_source, p, q):
-    cos_theta = (p * p_source + q * q_source + 1)/(math.sqrt(p*+2 + q**2 + 1) * math.sqrt(p_source**2 + q_source**2 + 1))
-    theta = math.acos(p * p_source + q * q_source + 1)/(math.sqrt(p*+2 + q**2 + 1) * math.sqrt(p_source**2 + q_source**2 + 1))
-    return theta, cos_theta
-
-
-# matrix multiplication part
-I = np.zeros((3, 1))
-S = np.zeros((3, 3))
-n = np.zeros((3, 1))
-"""
