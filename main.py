@@ -44,9 +44,7 @@ for img_file in image_files:
         print(f"Failed to load image {img_file}")
 
 
-# Convert the list of masked images to a NumPy array
-images = np.stack(images, axis=0)  # Shape: (num_images, height, width)
-print(f"Masked images shape: {images.shape}")
+
 
 
 images = np.stack(images, axis=-1)       # shape: [height, width, num_images]
@@ -84,7 +82,8 @@ print(f"Computed normal map: {normals.shape}")
 
 # VISUALIZING THE NORMAL MAP
 # Visualize the normal map components
-"""plt.figure(figsize=(12, 4))
+"""
+plt.figure(figsize=(12, 4))
 
 # Normal X (Red channel)
 plt.subplot(1, 3, 1)
@@ -105,7 +104,8 @@ plt.title('Normal Z (n_z)')
 plt.colorbar()
 
 plt.suptitle("Normal Map Components")
-plt.show()"""
+plt.show()
+"""
 
 # Normalize normals to [0, 1] for visualization
 normals_vis = (normals - normals.min()) / (normals.max() - normals.min())
