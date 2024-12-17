@@ -5,47 +5,50 @@ import math
 import os
 from mpl_toolkits.mplot3d import Axes3D
 
-"""
-circle data - calibration data/radii info for the object
-light_directions.txt - set of 20 light directions
-"""
+# EXTRACTING THE MASK
+# Load the mask image (assumed to be white object on black background)
+mask_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/Objects/Image_07.png"
+mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+# Ensure the mask is binary
+_, mask_binary = cv2.threshold(mask, 9, 1, cv2.THRESH_BINARY)
+# Check the mask
+plt.imshow(mask_binary, cmap='gray')
+plt.title("Binary Mask")
+plt.axis('off')
+plt.show()
 
+
+# LOADING THE DATA
 # paths to data
 image_directory_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/Objects"
-
 #circle_data_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/LightProbe-1/circle_data.txt"
 light_directions_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/light_directions.txt"
-
 light_directions = np.loadtxt(light_directions_path).T
 print(f"Loaded light directions: {light_directions.shape}")
 
-""
-"""
-light_directions_path = r"/Users/lukamelinc/Desktop/Belgija/Computer vision/WPO3/PSData/cat/refined_light.txt"
-with open(light_directions_path, 'r') as file:
-    cleaned_lines = [line.replace(',', '') for line in file]
 
-# Convert cleaned lines into a NumPy array
-import io
-light_directions = np.loadtxt(io.StringIO(''.join(cleaned_lines))).T
-
-print(f"Loaded light directions: {light_directions.shape}")"""
 
 
 # LOADING IMAGES
 exclude_name = "ref.JPG"
 image_files = [f for f in os.listdir(image_directory_path) if f.endswith(('.png')) and exclude_name not in f]
-
 images = []
 for img_file in image_files:
     img_path = os.path.join(image_directory_path, img_file)
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     if img is not None:
-        #print(img.shape)
-        images.append(img)
+        # Apply mask to the loaded image
+        masked_img = img * mask_binary
+        images.append(masked_img)
     else:
-        print(f"failed to load image {img_file}")
-    
+        print(f"Failed to load image {img_file}")
+
+plt.imshow(images[2])
+plt.show()
+# Convert the list of masked images to a NumPy array
+images = np.stack(images, axis=0)  # Shape: (num_images, height, width)
+print(f"Masked images shape: {images.shape}")
+
 
 images = np.stack(images, axis=-1)       # shape: [height, width, num_images]
 #images = images.astype(np.float32) / 255.0    # normalizing the image
@@ -153,3 +156,4 @@ X, Y = np.meshgrid(np.arange(w), np.arange(h))
 ax.plot_surface(X, Y, depth_map, cmap='viridis', edgecolor='none')
 plt.title('Reconstructed Surface')
 plt.show()
+
