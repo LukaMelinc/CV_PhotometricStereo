@@ -157,3 +157,22 @@ ax.plot_surface(X, Y, depth_map, cmap='viridis', edgecolor='none')
 plt.title('Reconstructed Surface')
 plt.show()
 
+# 2D Depth Map Visualization
+def display_2d_depth_map(depth_map, mask=None, title="2D Depth Representation"):
+    # Mask the depth map to keep only the object area (optional)
+    if mask is not None:
+        depth_map = depth_map * mask  # Apply mask to depth map
+
+    # Normalize depth values to range [0, 1] for visualization
+    depth_map_normalized = (depth_map - np.min(depth_map)) / (np.max(depth_map) - np.min(depth_map))
+
+    # Display the depth map with a colormap
+    plt.figure(figsize=(8, 6))
+    plt.imshow(depth_map_normalized, cmap='viridis')  # Use 'viridis' or other colormaps
+    plt.title(title)
+    plt.colorbar(label="Normalized Depth")  # Add a color bar for depth scale
+    plt.axis('off')
+    plt.show()
+
+# Display the 2D depth map
+display_2d_depth_map(depth_map, mask=mask_binary, title="2D Depth Map with Depth Colors")
